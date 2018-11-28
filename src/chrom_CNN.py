@@ -23,7 +23,7 @@ class chrom_CNN(object):
         self.epochs = 12
         
         # input dimensions
-        self.img_rows, self.img_cols = 1, 800 # second number can be any
+        self.img_rows, self.img_cols = 1, 1000 # second number can be any
         (self.x_train, self.y_train), (self.x_test, y_test) = load_training_data()
         
         if K.image_data_format() == 'channels_first':
