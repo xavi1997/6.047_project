@@ -8,76 +8,61 @@ import numpy as np
 
 import keras
 from keras import Sequential
+from keras import backend as K
 from keras.layers import Dense, Conv2D, MaxPooling2D, SpatialDropout2D, Flatten
 from keras.layers import BatchNormalization, Dropout
 
 # keras docs: https://keras.io
 
+from wig_extractor.py import load_training_data
 
 
-# make an adequate model out of this
-from __future__ import print_function
-import keras
-from keras.datasets import mnist
-from keras.models import Sequential
-from keras.layers import Dense, Dropout, Flatten
-from keras.layers import Conv2D, MaxPooling2D
-from keras import backend as K
+class chrom_CNN(object):
+    def __init__(self):
+        self.batch_size = 128
+        self.epochs = 12
+        
+        # input dimensions
+        self.img_rows, self.img_cols = 1, 800 # second number can be any
+        (self.x_train, self.y_train), (self.x_test, y_test) = load_training_data()
+        
+        if K.image_data_format() == 'channels_first':
+            self.x_train = self.x_train.reshape(self.x_train.shape[0], 1, self.img_rows, self.img_cols)
+            self.x_test = self.x_test.reshape(self.x_test.shape[0], 1, self.img_rows, self.img_cols)
+            self.input_shape = (1, self.img_rows, self.img_cols)
+        else:
+            self.x_train = self.x_train.reshape(self.x_train.shape[0], self.img_rows, self.img_cols, 1)
+            self.x_test = self.x_test.reshape(self.x_test.shape[0], self.img_rows, self.img_cols, 1)
+            self.input_shape = (self.img_rows, self.img_cols, 1)
 
-batch_size = 128
-num_classes = 10 # TODO we don't want a classifier. We want regression but between 0 and 1
-epochs = 12
-
-# input image dimensions
-img_rows, img_cols = 1, 300 # second number can be moved
-
-# the data, split between train and test sets
-# TODO
-(x_train, y_train), (x_test, y_test) = mnist.load_data()
-
-if K.image_data_format() == 'channels_first':
-    x_train = x_train.reshape(x_train.shape[0], 1, img_rows, img_cols)
-    x_test = x_test.reshape(x_test.shape[0], 1, img_rows, img_cols)
-    input_shape = (1, img_rows, img_cols)
-else:
-    x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
-    x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
-    input_shape = (img_rows, img_cols, 1)
-
-x_train = x_train.astype('float32')
-x_test = x_test.astype('float32')
-x_train /= 255
-x_test /= 255
-print('x_train shape:', x_train.shape)
-print(x_train.shape[0], 'train samples')
-print(x_test.shape[0], 'test samples')
-
-# convert class vectors to binary class matrices
-y_train = keras.utils.to_categorical(y_train, num_classes)
-y_test = keras.utils.to_categorical(y_test, num_classes)
-
-model = Sequential()
-model.add(Conv2D(32, kernel_size=(3, 3),
-                 activation='relu',
-                 input_shape=input_shape))
-model.add(Conv2D(64, (3, 3), activation='relu'))
-model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Dropout(0.25))
-model.add(Flatten())
-model.add(Dense(128, activation='relu'))
-model.add(Dropout(0.5))
-model.add(Dense(num_classes, activation='softmax'))
-
-model.compile(loss=keras.losses.categorical_crossentropy,
-              optimizer=keras.optimizers.Adadelta(),
-              metrics=['accuracy'])
-
-model.fit(x_train, y_train,
-          batch_size=batch_size,
-          epochs=epochs,
-          verbose=1,
-          validation_data=(x_test, y_test))
-score = model.evaluate(x_test, y_test, verbose=0)
-print('Test loss:', score[0])
-print('Test accuracy:', score[1])
+        self.x_train = self.x_train.astype('float32')
+        self.x_test = self.x_test.astype('float32')
+        print('x_train shape:', self.x_train.shape)
+        print(self.x_train.shape[0], 'train samples')
+        print(self.x_test.shape[0], 'test samples')
+        
+        model = Sequential()
+        model.add(Conv2D(32, kernel_size=(1, 9),
+                         activation='relu',
+                         input_shape=self.input_shape))
+        model.add(Conv2D(64, (1, 9), activation='relu'))
+        model.add(MaxPooling2D(pool_size=(1, 2)))
+        model.add(Dropout(0.25))
+        model.add(Flatten())
+        model.add(Dense(128, activation='relu'))
+        model.add(Dropout(0.5))
+        model.add(Dense(self.img_cols, activation='tanh')) # tanh is the kind of output we want. Between 0 and 1 and stronger gradients than sigmoid
+        
+        model.compile(loss=keras.losses.categorical_crossentropy,
+                      optimizer=keras.optimizers.Adadelta(),
+                      metrics=['accuracy']) # TODO change metrics
+        
+        model.fit(self.x_train, self.y_train,
+                  batch_size=self.batch_size,
+                  epochs=self.epochs,
+                  verbose=1,
+                  validation_data=(self.x_test, self.y_test))
+        score = model.evaluate(self.x_test, self.y_test, verbose=0)
+        print('Test loss:', score[0])
+        print('Test accuracy:', score[1])
 
