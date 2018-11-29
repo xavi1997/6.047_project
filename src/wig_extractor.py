@@ -8,6 +8,7 @@ Created on Tue Nov 27 17:58:53 2018
 import numpy as np
 import gzip
 import time
+import os
 
 # tells you which samples have which chromatin modification data
 DATA_INFO_DIR = "../data/all_data/EXAMPLE/tier1_samplemarktable.txt"
@@ -15,7 +16,15 @@ DATA_INFO_DIR = "../data/all_data/EXAMPLE/tier1_samplemarktable.txt"
 # data of celltype C with modification H is stored in 
 DATA_EXTENSION = ".pval.signal.bedGraph.wig.gz"
 
-DATA_DIR = "../data/all_data/EXAMPLE/CONVERTEDDATADIR/chr21_" # just add celltype, marker, and extension
+DATA_DIR_W_CHROM = "../data/all_data/EXAMPLE/CONVERTEDDATADIR/chr21_" # just add celltype, marker, and extension
+
+DATA_DIR = "../data/all_data/EXAMPLE/CONVERTEDDATADIR/" # folder with all data. Doesn't specify chromosome
+
+DATA_POINT_LEN = 1925196
+
+DATA_POINTS = 127
+
+
 
 def extract_cell_type_marks_avail():
     """
@@ -86,17 +95,42 @@ def load_training_data(mod1, mod2, split = 1000):
             cell_types.append(cell_type)
     
     for cell_type in cell_types:
-        input_filename = DATA_DIR + cell_type + "-" + mod1 + DATA_EXTENSION
+        input_filename = DATA_DIR_W_CHROM + cell_type + "-" + mod1 + DATA_EXTENSION
         inputs.append(extract_wig_gz(input_filename, split = split))
-        output_filename = DATA_DIR + cell_type + "-" + mod2 + DATA_EXTENSION
+        output_filename = DATA_DIR_W_CHROM + cell_type + "-" + mod2 + DATA_EXTENSION
         outputs.append(extract_wig_gz(output_filename, split = split))
     
     return np.array(inputs), np.array(outputs)
+    
+def process_data(split = None):
+    """
+    Processes all data in CONVERTEDDATADIR according to split. Saves data as .npy
+    files in specified directory.
+    
+    data originally has 1925196 numbers per sample
+    """
+    save_dir = "../data/processed_data_" + str(split) + "/"
+    for file in os.listdir(DATA_DIR):
+        if file == ".ds_Store":
+            continue
+        filename = DATA_DIR + file
+        splitted = extract_wig_gz(filename, split = split)
+        np.save(save_dir + file, splitted)
 
-x = time.time()
-mod1 = "H3K27me3"
-mod2 = "H3K36me3"
-a = load_training_data(mod1, mod2)
-print(a)
-print(time.time() - x)
+#==============================================================================
+# x = time.time()
+# mod1 = "H3K27me3"
+# mod2 = "H3K36me3"
+# a = load_training_data(mod1, mod2)
+# print(a)
+# print(time.time() - x)
+#==============================================================================
+
+
+
+#process_data(192519)
+
+if __name__ == "__main__":
+    a = load_training_data("H3K27me3", "H3K36me3", split = self.img_cols)
+    a = list(a)
 
