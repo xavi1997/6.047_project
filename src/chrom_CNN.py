@@ -14,17 +14,26 @@ from keras.layers import BatchNormalization, Dropout
 
 # keras docs: https://keras.io
 
-from wig_extractor.py import load_training_data
+from wig_extractor import load_training_data
 
 
 class chrom_CNN(object):
     def __init__(self):
-        self.batch_size = 128
+        self.batch_size = 32
         self.epochs = 12
         
         # input dimensions
-        self.img_rows, self.img_cols = 1, 800 # second number can be any
-        (self.x_train, self.y_train), (self.x_test, y_test) = load_training_data()
+        self.img_rows, self.img_cols = 1, 1000 # second number can be any
+        
+        
+        self.all_data = load_training_data("H3K27me3", "H3K36me3", split = self.img_cols)
+        first = int(.6*len(self.training_data))
+        second = int(.8*len(self.training_data))
+        self.x_train, self.y_train = self.all_data()[0][:first], self.all_data()[1][:first]
+        self.x_val, self.y_val = self.all_data()[0][first:second], self.all_data()[1][first:second]
+        self.x_test, self.y_test = self.all_data()[0][second:], self.all_data()[1][second:]
+
+        
         
         if K.image_data_format() == 'channels_first':
             self.x_train = self.x_train.reshape(self.x_train.shape[0], 1, self.img_rows, self.img_cols)
@@ -41,28 +50,38 @@ class chrom_CNN(object):
         print(self.x_train.shape[0], 'train samples')
         print(self.x_test.shape[0], 'test samples')
         
-        model = Sequential()
-        model.add(Conv2D(32, kernel_size=(1, 9),
+        self.model = Sequential()
+        self.model.add(Conv2D(32, kernel_size=(1, 11),
                          activation='relu',
                          input_shape=self.input_shape))
-        model.add(Conv2D(64, (1, 9), activation='relu'))
-        model.add(MaxPooling2D(pool_size=(1, 2)))
-        model.add(Dropout(0.25))
-        model.add(Flatten())
-        model.add(Dense(128, activation='relu'))
-        model.add(Dropout(0.5))
-        model.add(Dense(self.img_cols, activation='tanh')) # tanh is the kind of output we want. Between 0 and 1 and stronger gradients than sigmoid
+        self.model.add(Conv2D(64, (1, 11), activation='relu'))
+        self.model.add(MaxPooling2D(pool_size=(1, 2)))
+        self.model.add(Dropout(0.25))
+        self.model.add(Flatten())
+        self.model.add(Dense(200, activation='relu'))
+        self.model.add(Dropout(0.5))
+        self.model.add(Dense(self.img_cols, activation='tanh')) # tanh is the kind of output we want. Between 0 and 1 and stronger gradients than sigmoid
         
-        model.compile(loss=keras.losses.categorical_crossentropy,
+        def mean_dist(y_true, y_pred):
+            return K.mean(abs(y_true - y_pred))
+        
+        
+        self.model.compile(loss='mean_squared_error',
                       optimizer=keras.optimizers.Adadelta(),
-                      metrics=['accuracy']) # TODO change metrics
+                      metrics=['accuracy', mean_dist])
         
-        model.fit(self.x_train, self.y_train,
+    def train(self):
+        self.model.fit(self.x_train, self.y_train,
                   batch_size=self.batch_size,
                   epochs=self.epochs,
                   verbose=1,
-                  validation_data=(self.x_test, self.y_test))
-        score = model.evaluate(self.x_test, self.y_test, verbose=0)
+                  validation_data=(self.x_val, self.y_val))
+        score = self.model.evaluate(self.x_test, self.y_test, verbose=0)
         print('Test loss:', score[0])
         print('Test accuracy:', score[1])
+        print('Test mean_dist:', score[2])
 
+if __name__ == "__main__":
+    cnn = chrom_CNN()
+    cnn.train()
+    
